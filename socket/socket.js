@@ -18,30 +18,30 @@ const connectToSocket = (io) => {
 
     joinRoom(socket); // Fill 'players' data structure
 
-    if (opponentOf(socket)) {
+    if (getOpponentSocket(socket)) {
       socket.emit("game.begin", {
         symbol: players[socket.id].symbol,
       });
       console.log("Game begins!!");
 
-      opponentOf(socket).emit("game.begin", {
-        symbol: players[opponentOf(socket).id].symbol,
+      getOpponentSocket(socket).emit("game.begin", {
+        symbol: players[getOpponentSocket(socket).id].symbol,
       });
     }
 
     socket.on("make.move", (data) => {
-      if (!opponentOf(socket)) {
+      if (!getOpponentSocket(socket)) {
         return;
       }
 
       socket.emit("move.made", data);
 
-      opponentOf(socket).emit("move.made", data);
+      getOpponentSocket(socket).emit("move.made", data);
     });
 
     socket.on("disconnect", () => {
-      if (opponentOf(socket)) {
-        opponentOf(socket).emit("opponent.left");
+      if (getOpponentSocket(socket)) {
+        getOpponentSocket(socket).emit("opponent.left");
       }
     });
   });
@@ -63,7 +63,7 @@ const joinRoom = (socket) => {
   }
 };
 
-const opponentOf = (socket) => {
+const getOpponentSocket = (socket) => {
   if (!players[socket.id].opponent) {
     return;
   }
