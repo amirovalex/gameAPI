@@ -3,14 +3,14 @@ const cors = require("cors");
 const dotenv = require("dotenv");
 dotenv.config();
 const userRoutes = require("./routes/user.js");
-const connectToSocket = require("./socket/socket");
+const { connectToSocket } = require("./socket/socket");
 
 //EXPRESS APP
 const app = express();
 const port = process.env.PORT || 7070;
 
 //MIDDLEWARES
-app.use(cors({ origin: "*" }));
+// app.use(cors({ origin: "https://amirovalex.github.io" }));
 app.use(express.json());
 app.use("/", userRoutes);
 
@@ -21,7 +21,12 @@ const server = http.createServer(app);
 //Initialize socket
 const io = require("socket.io")(server, {
   cors: {
-    origin: "*",
+    origin: [
+      "https://amirovalex.github.io",
+      "http://localhost:3000",
+      "http://localhost:7071",
+    ],
+    methods: ["GET", "POST"],
   },
 });
 
