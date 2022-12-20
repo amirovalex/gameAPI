@@ -8,6 +8,7 @@ let unmatched;
 
 const connectToSocket = (io) => {
   return io.on("connection", async (socket) => {
+    console.log("SSOCKET", socket);
     let id = socket.id;
     let url = socket.handshake.query.urlHost;
     let idOtherServer = socket.handshake.query.id;

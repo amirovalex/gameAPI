@@ -7,10 +7,22 @@ const { connectToSocket } = require("./socket/socket");
 
 //EXPRESS APP
 const app = express();
+const app2 = express();
 const port = process.env.PORT || 7070;
+const port2 = process.env.PORT2 || 7072;
 
 //MIDDLEWARES
 // app.use(cors({ origin: "https://amirovalex.github.io" }));
+app.use(
+  cors({
+    origin: [
+      "https://amirovalex.github.io",
+      "http://localhost:3000",
+      "http://localhost:7070",
+    ],
+    methods: ["GET", "POST"],
+  })
+);
 app.use(express.json());
 app.use("/", userRoutes);
 

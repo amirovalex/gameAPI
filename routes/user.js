@@ -18,6 +18,19 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get("/server", async (req, res) => {
+  console.log("players object is existing", players);
+  console.log("request", req);
+  if (players) {
+    let playersCount = Object.keys(players).length;
+    console.log("players on the server", playersCount);
+
+    res.json({ country: "IL", players: playersCount });
+  } else {
+    res.json({ country: "IL", players: 0 });
+  }
+});
+
 router.post("/connect", async (req, res) => {
   try {
     if (getUnmatched()) {
