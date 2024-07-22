@@ -6,128 +6,126 @@ const clients = {};
 let players = {};
 let unmatched;
 
+// Function to handle socket connection
 const connectToSocket = (io) => {
-  return io.on("connection", async (socket) => {
-    console.log("SSOCKET", socket);
-    let id = socket.id;
-    let url = socket.handshake.query.urlHost;
-    let idOtherServer = socket.handshake.query.id;
+  io.on("connection", async (socket) => {
+    console.log("SOCKET", socket);
+    const id = socket.id;
+    const url = socket.handshake.query.urlHost;
+    const idOtherServer = socket.handshake.query.id;
 
-    console.log("New client connected. ID: ", socket.id);
-    // console.log("New client connected. HANDSHAKE: ", socket.handshake);
+    console.log("New client connected. ID:", id);
+
+    // Add new client to the clients object
     clients[socket.id] = socket;
     console.log("ID OTHER SERVER", idOtherServer);
+
+    // Handle client disconnect event
     socket.on("disconnect", () => {
-      console.log("Client disconnected. ID: ", socket.id);
+      console.log("Client disconnected. ID:", socket.id);
       delete clients[socket.id];
       socket.broadcast.emit("clientdisconnect", id);
     });
-    //check if client is coming from the server and if yes make a new connection on the server it came from
-    joinRoom(socket); // Fill 'players' data structure
+
+    // Join the room and check if the user is on another server
+    // joinRoom(socket);
     console.log(isUserOnOtherServer(socket));
 
-    // console.log(isUserOnOtherServer(opponentOf(socket)));
-    if (
-      (opponentOf(socket) && isUserOnOtherServer(opponentOf(socket))) ||
-      (unmatched && url !== "localhost:7071")
-    ) {
-      const secondAPI = ioClient(process.env.SOCKET_TWO_URL, {
-        query: {
-          id: id,
-          urlHost: "localhost:7070",
-        },
-      });
+    // If opponent is on another server or URL is not localhost:7071
 
-      if (opponentOf(socket)) {
-        socket.emit("game.begin", {
-          symbol: players[socket.id].symbol,
-        });
-        console.log("Game begins!!");
 
-        opponentOf(socket).emit("game.begin", {
-          symbol: players[opponentOf(socket).id].symbol,
-        });
-      }
-
-      socket.on("make.move", (data) => {
-        console.log(data);
-        if (!opponentOf(socket)) {
-          return;
-        }
-
-        secondAPI.emit("make.move", data);
-        console.log("IS GAME OVER", isGameOver(data.board));
-
-        if (isGameOver(data.board)) {
-          console.log("hey");
-          socket.emit("game.end", { winMessage: "You won!" });
-          opponentOf(socket).emit("game.end", {
-            winMessage: "You lost!",
+    socket.on("start.game", () => {
+      console.log("start game!", socket.id);
+      joinRoom(socket);
+      if(players[socket.id]) {
+        if (
+          (opponentOf(socket) && isUserOnOtherServer(opponentOf(socket))) ||
+          (unmatched && url !== "localhost:7071")
+        ) {
+          // Connect to the second API
+          const secondAPI = ioClient(process.env.SOCKET_TWO_URL, {
+            query: { id: id, urlHost: "localhost:7070" },
+          });
+    
+          // Notify both players that the game begins
+          if (opponentOf(socket)) {
+            socket.emit("game.begin", { symbol: players[socket.id].symbol });
+            console.log("Game begins!!");
+            opponentOf(socket).emit("game.begin", { symbol: players[opponentOf(socket).id].symbol });
+          }
+    
+          // Handle move made by a player
+          socket.on("make.move", (data) => {
+            console.log(data);
+            if (!opponentOf(socket)) return;
+    
+            // Forward move to the second API
+            secondAPI.emit("make.move", data);
+    
+            // Check if the game is over
+            if (isGameOver(data.board)) {
+              console.log("hey");
+              socket.emit("game.end", { winMessage: "You won!" });
+              opponentOf(socket).emit("game.end", { winMessage: "You lost!" });
+            }
+            // Notify both players about the move
+            socket.emit("move.made", data);
+            opponentOf(socket).emit("move.made", data);
+          });
+    
+          // Handle client disconnect
+          socket.on("disconnect", () => {
+            if (opponentOf(socket)) {
+              opponentOf(socket).emit("opponent.left");
+              secondAPI.emit("opponent.left");
+            }
+          });
+          console.log(url);
+        } else {
+          // Notify both players that the game begins
+          if (opponentOf(socket)) {
+            socket.emit("game.begin", { symbol: players[socket.id].symbol });
+            console.log("Game begins!!");
+            opponentOf(socket).emit("game.begin", { symbol: players[opponentOf(socket).id].symbol });
+          }
+    
+          // Handle move made by a player
+          socket.on("make.move", (data) => {
+            console.log(data);
+            if (!opponentOf(socket)) return;
+    
+            // Check if the game is over
+            if (isGameOver(data.board)) {
+              console.log("hey");
+              socket.emit("game.end", { winMessage: "You won!" });
+              opponentOf(socket).emit("game.end", { winMessage: "You lost!" });
+            }
+            // Notify both players about the move
+            socket.emit("move.made", data);
+            opponentOf(socket).emit("move.made", data);
+          });
+    
+          // Handle game reset
+          socket.on("reset.game", () => {
+            if (!opponentOf(socket)) return;
+    
+            socket.emit("game.reseted", { myTurn: true });
+            opponentOf(socket).emit("game.reseted", { myTurn: false });
+          });
+    
+          // Handle client disconnect
+          socket.on("disconnect", () => {
+            if (opponentOf(socket)) {
+              opponentOf(socket).emit("opponent.left");
+            }
           });
         }
-        socket.emit("move.made", data);
-        opponentOf(socket).emit("move.made", data);
-      });
-
-      socket.on("disconnect", () => {
-        if (opponentOf(socket)) {
-          opponentOf(socket).emit("opponent.left");
-          secondAPI.emit("opponent.left");
-        }
-      });
-      console.log(url);
-    } else {
-      if (opponentOf(socket)) {
-        socket.emit("game.begin", {
-          symbol: players[socket.id].symbol,
-        });
-        console.log("Game begins!!");
-
-        opponentOf(socket).emit("game.begin", {
-          symbol: players[opponentOf(socket).id].symbol,
-        });
       }
-      console.log(
-        "PLAAAAAYEEERS AFTER GAME BEGINS",
-        players,
-        "PLAAAAAYEEERS AFTER GAME BEGINS"
-      );
-
-      socket.on("make.move", (data) => {
-        console.log(data);
-        if (!opponentOf(socket)) {
-          return;
-        }
-
-        if (isGameOver(data.board)) {
-          console.log("hey");
-          socket.emit("game.end", { winMessage: "You won!" });
-          opponentOf(socket).emit("game.end", { winMessage: "You lost!" });
-        }
-        socket.emit("move.made", data);
-
-        opponentOf(socket).emit("move.made", data);
-      });
-
-      socket.on("reset.game", () => {
-        if (!opponentOf(socket)) {
-          return;
-        }
-
-        socket.emit("game.reseted", { myTurn: true });
-
-        opponentOf(socket).emit("game.reseted", { myTurn: false });
-      });
-
-      socket.on("disconnect", () => {
-        if (opponentOf(socket)) {
-          opponentOf(socket).emit("opponent.left");
-        }
-      });
-    }
+    })
   });
 };
 
+// Function to handle joining a room
 const joinRoom = (socket) => {
   console.log("room joined", socket.id);
   players[socket.id] = {
@@ -135,12 +133,16 @@ const joinRoom = (socket) => {
     symbol: "X",
     socket: socket,
   };
-  console.log("PLYAERS", players);
+  console.log("PLAYERS", players);
 
+  // Assign symbol and opponent
   if (unmatched) {
+    console.log('unmatch present', unmatched)
     players[socket.id].symbol = "O";
     players[unmatched].opponent = socket.id;
-    unmatched = null;
+    console.log('players after unmatch', players)
+    // console.log(players)
+    unmatched = undefined;
   } else {
     unmatched = socket.id;
   }
